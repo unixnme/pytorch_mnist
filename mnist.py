@@ -68,12 +68,12 @@ class Net(nn.Module):
         self.softmax = AngleSoftmax(10)
 
     def forward(self, x):
-        x = F.relu(self.conv1(x))
+        x = F.elu(self.conv1(x))
         x = self.bn1(x)
-        x = F.relu(F.max_pool2d(self.conv2(x), 2))
-        x = F.relu(self.conv3(x))
+        x = F.elu(F.max_pool2d(self.conv2(x), 2))
+        x = F.elu(self.conv3(x))
         x = self.bn2(x)
-        x = F.relu(F.max_pool2d(self.conv4_drop(self.conv4(x)), 2))
+        x = F.elu(F.max_pool2d(self.conv4_drop(self.conv4(x)), 2))
         x = x.view(-1, 320)
         x = self.fc1(x)
         x = self.softmax(x)
@@ -85,12 +85,12 @@ class FeatureExtractor(Net):
         self.load_state_dict(model.state_dict())
 
     def forward(self, x):
-        x = F.relu(self.conv1(x))
+        x = F.elu(self.conv1(x))
         x = self.bn1(x)
-        x = F.relu(F.max_pool2d(self.conv2(x), 2))
-        x = F.relu(self.conv3(x))
+        x = F.elu(F.max_pool2d(self.conv2(x), 2))
+        x = F.elu(self.conv3(x))
         x = self.bn2(x)
-        x = F.relu(F.max_pool2d(self.conv4_drop(self.conv4(x)), 2))
+        x = F.elu(F.max_pool2d(self.conv4_drop(self.conv4(x)), 2))
         x = x.view(-1, 320)
         x = self.fc1(x)
         return x
