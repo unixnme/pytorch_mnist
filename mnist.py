@@ -1,8 +1,9 @@
-from __future__ import print_function
+import math
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
+from torch.nn.parameter import Parameter
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -60,15 +61,15 @@ class Net(nn.Module):
         self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
         self.conv2_drop = nn.Dropout2d()
         self.fc1 = nn.Linear(320, ndim)
-        self.fc2 = nn.Linear(ndim, 10, bias=False)
+        self.softmax = AngleSoftmax(10)
 
     def forward(self, x):
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
         x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
         x = x.view(-1, 320)
         x = self.fc1(x)
-        x = self.fc2(x)
-        return F.log_softmax(x, dim=1)
+        x = self.softmax(x)
+        return x
 
 class FeatureExtractor(Net):
     def __init__(self, model):
@@ -82,11 +83,23 @@ class FeatureExtractor(Net):
         x = self.fc1(x)
         return x
 
-model = Net(2)
-if args.cuda:
-    model.cuda()
+class AngleSoftmax(nn.Module):
+    def __init__(self, out_feature):
+        super(AngleSoftmax, self).__init__()
+        self.out_feature = out_feature
+        self.weight = Parameter(torch.Tensor(1, out_feature))
+        self.reset_parameters()
 
-optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+    def reset_parameters(self):
+        stdv = 1. / math.sqrt(self.weight.size(1))
+        self.weight.data.uniform_(-stdv, stdv)
+
+    def forward(self, x):
+        u = torch.cos(self.weight)
+        v = torch.sin(self.weight)
+        w = torch.cat([u, v], dim=0)
+        x = x.mm(w)
+        return F.log_softmax(x)
 
 def train(epoch):
     model.train()
@@ -140,6 +153,10 @@ def plot_features(model):
 
 
 if __name__ == '__main__':
+    model = Net(2)
+    if args.cuda:
+        model.cuda()
+    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
     model_file = 'model.h5'
     if not os.path.isfile(model_file):
         for epoch in range(1, args.epochs + 1):
