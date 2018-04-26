@@ -54,8 +54,9 @@ test_loader = torch.utils.data.DataLoader(
 
 
 class Net(nn.Module):
-    def __init__(self, ndim=2):
+    def __init__(self, ndim=2, last_layer=True):
         super(Net, self).__init__()
+        self.last_layer = last_layer
         self.ndim = ndim
         self.conv1 = nn.Conv2d(1, 10, kernel_size=3)
         self.bn1 = nn.BatchNorm2d(10, affine=True)
@@ -76,23 +77,8 @@ class Net(nn.Module):
         x = F.elu(F.max_pool2d(self.conv4_drop(self.conv4(x)), 2))
         x = x.view(-1, 320)
         x = self.fc1(x)
-        x = self.softmax(x)
-        return x
-
-class FeatureExtractor(Net):
-    def __init__(self, model):
-        super(FeatureExtractor, self).__init__(model.ndim)
-        self.load_state_dict(model.state_dict())
-
-    def forward(self, x):
-        x = F.elu(self.conv1(x))
-        x = self.bn1(x)
-        x = F.elu(F.max_pool2d(self.conv2(x), 2))
-        x = F.elu(self.conv3(x))
-        x = self.bn2(x)
-        x = F.elu(F.max_pool2d(self.conv4_drop(self.conv4(x)), 2))
-        x = x.view(-1, 320)
-        x = self.fc1(x)
+        if self.last_layer is True:
+            x = self.softmax(x)
         return x
 
 class AngleSoftmax(nn.Module):
@@ -178,7 +164,8 @@ if __name__ == '__main__':
     else:
         model = torch.load(model_file)
 
-    feature_model = FeatureExtractor(model)
+    feature_model = Net(2, last_layer=False)
+    feature_model.load_state_dict(model.state_dict())
     if args.cuda:
         feature_model.cuda()
     plot_features(feature_model)
