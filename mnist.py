@@ -65,7 +65,8 @@ class Net(nn.Module):
         self.bn2 = nn.BatchNorm2d(20, affine=True)
         self.conv4 = nn.Conv2d(20, 20, kernel_size=3)
         self.conv4_drop = nn.Dropout2d()
-        self.fc1 = nn.Linear(320, ndim)
+        self.fc1 = nn.Linear(320, 50)
+        self.fc2= nn.Linear(50, ndim)
         self.softmax = AngleSoftmax(10)
 
     def forward(self, x):
@@ -76,7 +77,8 @@ class Net(nn.Module):
         x = self.bn2(x)
         x = F.elu(F.max_pool2d(self.conv4_drop(self.conv4(x)), 2))
         x = x.view(-1, 320)
-        x = self.fc1(x)
+        x = F.elu(self.fc1(x))
+        x = self.fc2(x)
         if self.last_layer is True:
             x = self.softmax(x)
         return x
