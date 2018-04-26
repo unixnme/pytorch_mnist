@@ -1,4 +1,7 @@
 from __future__ import print_function
+import os
+import numpy as np
+import matplotlib.pyplot as plt
 import argparse
 import torch
 import torch.nn as nn
@@ -50,24 +53,36 @@ test_loader = torch.utils.data.DataLoader(
 
 
 class Net(nn.Module):
-    def __init__(self):
+    def __init__(self, ndim=2):
         super(Net, self).__init__()
+        self.ndim = ndim
         self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
         self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
         self.conv2_drop = nn.Dropout2d()
-        self.fc1 = nn.Linear(320, 50)
-        self.fc2 = nn.Linear(50, 10)
+        self.fc1 = nn.Linear(320, ndim)
+        self.fc2 = nn.Linear(ndim, 10, bias=False)
 
     def forward(self, x):
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
         x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
         x = x.view(-1, 320)
-        x = F.relu(self.fc1(x))
-        x = F.dropout(x, training=self.training)
+        x = self.fc1(x)
         x = self.fc2(x)
         return F.log_softmax(x, dim=1)
 
-model = Net()
+class FeatureExtractor(Net):
+    def __init__(self, model):
+        super(FeatureExtractor, self).__init__(model.ndim)
+        self.load_state_dict(model.state_dict())
+
+    def forward(self, x):
+        x = F.relu(F.max_pool2d(self.conv1(x), 2))
+        x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
+        x = x.view(-1, 320)
+        x = self.fc1(x)
+        return x
+
+model = Net(2)
 if args.cuda:
     model.cuda()
 
@@ -107,7 +122,34 @@ def test():
         test_loss, correct, len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
 
+def plot_features(model):
+    model.eval()
+    for data, target in test_loader:
+        if args.cuda:
+            data, target = data.cuda(), target.cuda()
+        data, target = Variable(data, volatile=True), Variable(target)
+        output = model(data)
+        output = output.cpu().data.numpy()
+        target = target.cpu().data.numpy()
+        for label in range(10):
+            idx = target == label
+            plt.scatter(output[idx,0], output[idx,1])
+        plt.legend(np.arange(10, dtype=np.int32))
+        plt.show()
+        break
 
-for epoch in range(1, args.epochs + 1):
-    train(epoch)
-    test()
+
+if __name__ == '__main__':
+    model_file = 'model.h5'
+    if not os.path.isfile(model_file):
+        for epoch in range(1, args.epochs + 1):
+            train(epoch)
+            test()
+        torch.save(model, model_file)
+    else:
+        model = torch.load(model_file)
+
+    feature_model = FeatureExtractor(model)
+    if args.cuda:
+        feature_model.cuda()
+    plot_features(feature_model)
