@@ -36,7 +36,6 @@ torch.manual_seed(args.seed)
 
 device = torch.device("cuda" if use_cuda else "cpu")
 
-
 kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 train_loader = torch.utils.data.DataLoader(
     datasets.MNIST('../data', train=True, download=True,
@@ -52,7 +51,6 @@ test_loader = torch.utils.data.DataLoader(
                    ])),
     batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
-
 class Net(nn.Module):
     def __init__(self, ndim=2, last_layer=True):
         super(Net, self).__init__()
@@ -63,9 +61,10 @@ class Net(nn.Module):
         self.conv3 = nn.Conv2d(32, 64, kernel_size=3) # 10
         self.conv4 = nn.Conv2d(64, 64, kernel_size=3) # 8 --> 4
         self.conv5 = nn.Conv2d(64, 128, kernel_size=3) # 2
-        self.fc1 = nn.Linear(512, 128)
-        self.fc2 = nn.Linear(128, 32)
-        self.fc3= nn.Linear(32, ndim)
+        self.conv5_drop = nn.Dropout2d()
+        self.fc1 = nn.Linear(512, 128, bias=False)
+        self.fc2 = nn.Linear(128, 32, bias=False)
+        self.fc3= nn.Linear(32, ndim, bias=False)
         self.softmax = AngleSoftmax(10)
 
     def forward(self, x):
@@ -73,7 +72,7 @@ class Net(nn.Module):
         x = F.elu(F.max_pool2d(self.conv2(x), 2))
         x = F.elu(self.conv3(x))
         x = F.elu(F.max_pool2d(self.conv4(x), 2))
-        x = F.elu(self.conv5(x))
+        x = F.elu(self.conv5_drop(self.conv5(x)))
         x = x.view(-1, 512)
         x = F.elu(self.fc1(x))
         x = F.elu(self.fc2(x))
@@ -97,7 +96,8 @@ class AngleSoftmax(nn.Module):
         u = torch.cos(self.weight)
         v = torch.sin(self.weight)
         w = torch.cat([u, v], dim=0)
-        x = x.mm(w)
+        x = x.view(-1,2,1) - w.view(1,2,-1)
+        x = -torch.log(1 + torch.sum(x**2, dim=1))
         return F.log_softmax(x, dim=1)
 
 def train(epoch):
@@ -107,6 +107,8 @@ def train(epoch):
         optimizer.zero_grad()
         output = model(data)
         loss = F.nll_loss(output, target)
+        if loss.item() != loss.item():
+            pass
         loss.backward()
         optimizer.step()
         if batch_idx % args.log_interval == 0:
