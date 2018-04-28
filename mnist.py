@@ -66,7 +66,8 @@ class Net(nn.Module):
         self.fc1 = nn.Linear(512, 128, bias=False)
         self.fc2 = nn.Linear(128, 32, bias=False)
         self.fc3= nn.Linear(32, ndim, bias=False)
-        self.softmax = AngleSoftmax(10)
+        #self.softmax = AngleSoftmax(10)
+        self.softmax = MyLinear(ndim, 10, bias=False)
 
     def forward(self, x):
         x = F.elu(self.conv1(x))
@@ -81,6 +82,15 @@ class Net(nn.Module):
         if self.last_layer is True:
             x = self.softmax(x)
         return x
+
+class MyLinear(nn.Linear):
+    def forward(self, x):
+        w = self.weight.t()
+        w_norm = torch.sum(w**2, dim=0, keepdim=True) ** 0.5
+        w = w / w_norm
+        d = x.view(x.shape + (1,)) - w.view((1,) + w.shape)
+        x = -torch.sum(d**2, dim=1) ** 0.5
+        return F.log_softmax(x, dim=1)
 
 class AngleSoftmax(nn.Module):
     def __init__(self, out_feature):
