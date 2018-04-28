@@ -2,6 +2,7 @@ import math
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import argparse
 from torch.nn.parameter import Parameter
 import torch
@@ -151,15 +152,29 @@ def plot_features(model):
             output = model(data)
             output = output.cpu().data.numpy()
             target = target.cpu().data.numpy()
+            if model.ndim == 3:
+                fig = plt.figure()
+                ax = Axes3D(fig)
             for label in range(10):
                 idx = target == label
-                plt.scatter(output[idx,0], output[idx,1])
+                if model.ndim == 2:
+                    plt.scatter(output[idx,0], output[idx,1])
+                elif model.ndim == 3:
+                    ax.scatter(output[idx,0], output[idx,1], output[idx,2])
             plt.legend(np.arange(10, dtype=np.int32))
+            if model.ndim == 3:
+                ax.set_xlim(-1.5, 1.5)
+                ax.set_ylim(-1.5, 1.5)
+                ax.set_zlim(-1.5, 1.5)
+                ax.set_xlabel('X Label')
+                ax.set_ylabel('Y Label')
+                ax.set_zlabel('Z Label')
             plt.show()
             break
 
 if __name__ == '__main__':
-    model = Net(2).to(device)
+    ndim = 3
+    model = Net(ndim).to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
     model_file = 'model.h5'
     if not os.path.isfile(model_file):
@@ -170,7 +185,7 @@ if __name__ == '__main__':
     else:
         model = torch.load(model_file)
 
-    feature_model = Net(2, last_layer=False)
+    feature_model = Net(ndim, last_layer=False)
     feature_model.load_state_dict(model.state_dict())
     feature_model.to(device)
     plot_features(feature_model)
