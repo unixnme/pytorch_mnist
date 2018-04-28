@@ -98,7 +98,7 @@ class AngleSoftmax(nn.Module):
         v = torch.sin(self.weight)
         w = torch.cat([u, v], dim=0)
         x = x.view(-1,2,1) - w.view(1,2,-1)
-        x = -torch.tanh(torch.sum(x**2, dim=1))
+        x = -(torch.sum(x**2, dim=1)) ** 0.5
         return F.log_softmax(x, dim=1)
 
 def train(epoch):
