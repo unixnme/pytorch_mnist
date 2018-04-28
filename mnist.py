@@ -33,6 +33,7 @@ args = parser.parse_args()
 use_cuda = not args.no_cuda and torch.cuda.is_available()
 
 torch.manual_seed(args.seed)
+torch.cuda.manual_seed(args.seed)
 
 device = torch.device("cuda" if use_cuda else "cpu")
 
@@ -97,7 +98,7 @@ class AngleSoftmax(nn.Module):
         v = torch.sin(self.weight)
         w = torch.cat([u, v], dim=0)
         x = x.view(-1,2,1) - w.view(1,2,-1)
-        x = -torch.log(1 + torch.sum(x**2, dim=1))
+        x = -torch.tanh(torch.sum(x**2, dim=1))
         return F.log_softmax(x, dim=1)
 
 def train(epoch):
@@ -107,14 +108,13 @@ def train(epoch):
         optimizer.zero_grad()
         output = model(data)
         loss = F.nll_loss(output, target)
-        if loss.item() != loss.item():
-            pass
         loss.backward()
         optimizer.step()
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
+            pass
 
 def test():
     model.eval()
